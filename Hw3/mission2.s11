@@ -1,0 +1,54 @@
+mission2: ; input - root address (label) via stack
+	tst 2(sp) ; check if the current node is NIL
+	beq nilPtr ; if NIL - return 0
+	
+	mov 2(sp), r0
+	mov (r0), -(sp) ; current node moves length
+	mov 2(r0), r2 ; moves address
+	
+setArray: 
+	mov MovesLen, r1 ; r1 is an iterator of the moves string
+	movb (r2)+, Moves(r1)
+	inc r1
+	cmp r1, (sp) ; compares the counter of the moves equal to the current node moves length
+	bne setArray ; if not equal - repeat
+	add (sp), MovesLen  ; else continue
+	
+	
+	tst 4(r0)  ; check if the initial board address is NIL
+	beq leftSon ; if NIL - move to left son
+	mov Moves, -(sp) ; moves address
+	mov #MovesLen, -(sp) ; moves length
+	mov 4(r0), -(sp) ; board adress
+	jsr pc, findInit
+	
+nilPtr: 
+	mov #0, 4(sp); if so – return 0 and exit
+	br exit
+
+leftSon: 
+	mov 6(r0), r0 ; left son node address
+	mov r0, -(sp)
+	jsr pc, mission2 ; call mission2 to handle the left son
+	
+	tst (sp)
+	beq rightSon
+	
+rightSon: 
+	mov 8(r0), r0 ; left son node address
+	mov r0, (sp) ; right son node address instead of left son node address
+	jsr pc, mission2 ; call mission2 to handle the right son
+	
+	tst (sp)
+	beq exit
+
+exit: 
+	mov (sp)+,r2 
+	mov (sp)+,r1 
+	mov (sp)+,r0
+	tst (sp)+ ; clean the local variable
+	rts pc
+
+Moves: .blkw 5
+MovesLen: .word 0
+

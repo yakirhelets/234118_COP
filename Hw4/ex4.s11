@@ -1,0 +1,484 @@
+tks = 177560
+tkb = 177562
+tps = 177564
+tpb = 177566
+cls = 177546
+.= torg+1000
+main:mov pc,sp 
+	 tst -(sp)
+	 mov #checker, @#60 ; setting keyboard vector
+	 mov #200, @#62 ; setting keyboard priority 4
+	 mov #printing,@#64;setting printer vector
+	 mov #200,@#66;setting printer priority 4
+	 clr cls ; clock is not allowed to interrupt 
+	 mov #printing, @#20 ; iot trap initialization
+	 mov #200, @#22
+	 mov #Clock, @#100 ; setting Clock vector
+	 mov #300,  @#102 ; setting clock priority -> 6
+	 ;~~~~~~~~~~~~~~~~~~~~~~ now printing ms1 and scanning rows num
+	 mov #MS1,-(sp)
+	 jsr pc,printf;printing ms1
+	 add #2,sp;cleaning the stack
+	 jsr pc,endl 
+	 mov #insertRows,-(sp)
+	 jsr pc,scanf;scan the number of rows
+	 bic #170, insertRows
+	 ;~~~~~~~~~~~~~~~~~~~~~~ now printing ms2 and scanning cols num
+	 jsr pc,endl
+	 mov #MS2,-(sp)
+	 jsr pc,printf;printing ms2
+	 add #2,sp;cleaning the stack
+	 jsr pc,endl
+	 mov #insertCols,-(sp)
+	 jsr pc,scanf;scan the number of cols
+	 bic #170, insertCols
+	 ;~~~~~~~~~~~~~~~~~~~~~~
+	 jsr pc,endl
+	 mov #MS3,-(sp)
+	 jsr pc,printf;printing ms3
+	 add #2,sp
+	 jsr pc,endl
+	 mov #GameTimeStr,-(sp)
+	 jsr pc,scanf;scans the wanted amount of time (base 8)
+	 jsr pc,strToTime
+	 mov Gametime,counterGameTime
+	 mov rate,counterClockRate
+	 ;~~~~~~~~~~~~~~~~~~~~~~
+	 jsr pc,endl
+	 mov #MS4,-(sp)
+	 jsr pc,printf;printing ms4
+	 add #2,sp
+	 jsr pc,endl
+	 mov #board17,-(sp)
+	 jsr pc,scanf;scans the board in base 17
+	 mov #boardToPrint,-(sp)
+	 mov #board17,-(sp)
+	 jsr pc,printAsBoard
+	 jsr pc, strToBoard ; calls strToBoard to handle the string
+	 ;~~~~~~~~~~~~~~~~~~~~~~~~
+	 jsr pc,endl
+	 mov #MS5p1,-(sp)
+	 jsr pc,printf;printing ms5p1
+	 add #2,sp
+	 mov #GameTime,-(sp)
+	 jsr pc,printf;printing the gameTime
+	 add #2,sp
+	 mov #MS5p2,-(sp)
+	 jsr pc,printf;printing ms5p2
+	 add #2,sp
+	 jsr pc,endl
+	 mov #MS5p3,-(sp)
+	 jsr pc,printf
+	 add #2,sp
+	 mov #okGoEnter,-(sp)
+	 jsr pc,scanf;scans the enter that orders the start of the game
+	 bis #100,cls
+tstss:	 wait
+		br tstss
+	 ;~~~~~~~~~~~~~~~~~~~~~~~~
+	 jsr pc,printCurrState
+	 jsr pc,endl
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+.=torg+5000
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+printAsBoard:  ; input - address to the new string via stack, address to the original string via stack, width and height via common area
+				 ; output - the new string ready to print as a board in the new string
+		mov r0, -(sp) ; saves the registers in stack
+		mov r1, -(sp)
+		mov r2, -(sp)
+		mov r3, -(sp)
+		mov 10.(sp), r0 ; r0 holds a pointer to the current char index in the original string
+		mov 12.(sp), r1 ; r1 holds a pointer to the current index in the new string
+		dec r1
+		mov #1, r2; r2 is the current digit	
+asBoardLoop:
+		cmpb #0., (r0) ; checks if current char points to the end of the string
+		beq asBoardEnd	
+		movb (r0), r3 ; r3 holds the value of the index that appears in r0
+		cmp r3, #71 ; if the ascii code is greater than 71 it is a letter
+		bgt boardLetter; else it a digit
+		sub #60, r3 ; converts from ascii code to an actual number
+		br insert
+boardLetter:
+		sub #67, r3 ; converts from ascii code to the letter's index in the ABC
+insert:
+		add r3, r1 ; r1 holds the current digit (r2) place on the board
+		movb r2, (r1) ; move the current digit to its place on the new board
+		sub r3, r1 ; returns to the start of the board
+		inc r2 ; moves to the next digit
+		inc r0 ; moves to the next  index
+		br asBoardLoop	
+asBoardEnd: ; now we should have an array sorted by indexes. all there is left is to translate from octal to ascii codes		
+		mov insertCols,r0
+		mul insertRows,r0
+		mov r1, r0 ; r0 holds the size of the new string
+		dec r0
+		mov 12.(sp), r1 ; r1 holds a pointer to the current index in the new string
+		add r1, r0 ; r0 now holds the address to the last char in the string
+translateLoop:
+		cmpb r1, r0 ; if we passed the last index on the board
+		bgt tranEnd
+		movb (r1), r3 ; r3 holds the current octal value
+		cmpb #0, r3 ; checks if the current index is empty
+		bne tranCon
+		movb #'*, r3 ; if so, move '*' to the empty spot
+		br transcontinue
+tranCon: ; else continue
+		cmpb r3, #9. ; checks if the current index is a digit or a letter
+		bgt transLetter ; if letter, turn it into the ascii value of the current digit
+		add #60, r3 ; if digit, turn it into the ascii value of the current digit
+		br transcontinue
+transLetter:
+		add #67, r3 ; if letter, turn it into the ascii value of the current letter
+transcontinue:
+		movb r3, (r1) ; moves the value to its place
+		inc r1
+		br translateLoop		
+tranEnd:
+		mov (sp)+, r3
+		mov (sp)+, r2 ; cleans up the stack
+		mov (sp)+, r1
+		mov (sp)+, r0
+		rts pc
+;-------------------------------
+strToBoard:  ; input - address to board17 via stack, output - board in octal base written in InitialBoard
+		mov r0, -(sp) ; saves the registers in stack
+		mov r1, -(sp)
+		mov r2, -(sp)
+		mov 10(sp), r0 ; r0 holds a pointer to the current char in boardStr
+		clr r2 ; r2 is a pointer to the current index in InitialBoard
+		
+	toBoardLoop:
+		movb (r0), r1 ; r1 holds the actual char ascii code
+		cmpb #0., r1 ; checks if current char is the end of the string
+		beq toBoardEnd
+		cmp r1, #71 ; if the ascii code is greater than 71 it is a letter
+		bgt letter; else it a digit
+		sub #60, r1 ; converts from ascii code to an actual number
+		br insertToBoard
+	letter:
+		sub #67, r1 ; converts from ascii code to the letter's index in the ABC
+	insertToBoard:
+		movb r1, InitialBoard(r2) ; inserts the the current index in octal base
+		inc r0 ; points to the next char in the string
+		inc r2 ; points to the next index in the board
+		br toBoardLoop	
+	toBoardEnd:
+		mov (sp)+, r2 ; cleans up the stack
+		mov (sp)+, r1
+		mov (sp)+, r0
+		rts pc
+;-------------------------------
+boardToStr:  ; input - board in octal base via common area (InitialBoard), output - boardStr written in board17
+		mov r0, -(sp) ; saves the registers in stack
+		mov r1, -(sp)
+		mov r2, -(sp)
+		mov #InitialBoard, r0 ; r0 holds a pointer to the current char in InitialBoard
+		clr r2 ; r2 is a pointer to the current index in InitialBoard
+		
+	ToStrLoop:
+		movb (r0), r1 ; r1 holds an octal number from InitialBoard
+		cmpb #0., r1 ; checks if current char is the end of the board
+		beq toStrEnd
+		cmpb r1, #9. ; if the number is greater than 9. it is a letter
+		bgt letter; else it a digit
+		add #60, r1 ; converts from ocatl to an ascii code of the digit
+		br insertToString:
+	letter:
+		add #67, r1 ; converts from ocatl to an ascii code of the letter
+	insertToString
+		movb r1, board17(r2) ; inserts the the current index in octal base
+		inc r0 ; points to the next char in the string
+		inc r2 ; points to the next index in the board
+		br ToStrLoop	
+	toStrEnd:
+		mov (sp)+, r2 ; cleans up the stack
+		mov (sp)+, r1
+		mov (sp)+, r0
+		rts pc
+;-------------------------------
+strToTime:  ; input - address to timeStr via stack (inserted in octal base), output - time in octal base in Time via common area
+		mov r0, -(sp) ; saves the registers in stack
+		mov r1, -(sp)
+		mov 6(sp), r0 ; r0 holds a pointer to the current char in timeStr
+		
+	toTimeLoop:
+		movb (r0), r1 ; r1 holds the actual char ascii code
+		cmpb #0., r1 ; checks if current char is the end of the string
+		beq toTimeEnd
+		bic #170, r1 ; converts from ascii code to an actual number
+		asl Gametime
+		asl Gametime
+		asl Gametime
+		add r1, Gametime
+		inc r0 ; points to the next char in the string
+		br toTimeLoop	
+	toTimeEnd:
+		mov (sp)+, r1 ; cleans up the stack
+		mov (sp)+, r0
+		rts pc
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+changeStrToNum:	mov r0,-(sp)
+				mov r1,-(sp)
+				mov r2,-(sp)
+				mov r3,-(sp)
+				mov r4,-(sp)
+				mov r5,-(sp)
+				mov #1,r4
+				mov lastInputLen,r0
+setR4:			cmp #1,r0
+				beq allSet
+				mul #10,r4
+				mov r5,r4
+				sob r0,setR4
+				mov r1,r4
+allSet:		 	mov #GameTimeStr,r3;r4 holds the address of the str we want to convert (we know its length is 4 bytes)
+				mov lastInputLen,r2;r2 is the times we need to mul by 10.	
+changeLoop:		
+subLoop:		movb (r3)+,r0
+				cmp #0,r4
+				beq justAdd
+				mul r4,r0
+				add r1,Gametime
+				sxt r4
+				div #10,r4
+				sob r2,subLoop
+				dec r2
+justAdd:		add r0,Gametime
+				mov #GameTimeStr,r0
+				add lastInputLen,r0
+				cmp r3,r0
+				beq exit
+				inc r3
+				br changeLoop
+exit:			mov (sp)+,r5
+				mov (sp)+,r4
+				mov (sp)+,r3
+				mov (sp)+,r2
+				mov (sp)+,r1
+				mov (sp)+,r0
+				rts pc
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+printCurrState:mov #MS6,-(sp)
+			   jsr pc,printf
+			   add #2,sp
+			   jsr pc,endl
+			   jsr pc,squarePrint
+			   mov #MS7,-(sp)
+			   jsr pc,printf
+			   add #2,sp
+			   jsr pc,endl
+			   rts pc
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+squarePrint:
+			 mov r0,-(sp)
+			 mov r1,-(sp)
+			 mov r2,-(sp)
+			 mov r3,-(sp)
+			 mov #squareStr,r3
+			 mov #boardToPrint,r0
+			 mov insertCols,r1
+			 mov insertRows,r2
+			 br colsloop
+			 
+colsloop:    tst r1
+			 beq theEnd
+			 br rowsloop
+rowsloop:	
+			 tst r2
+			 beq newIteration
+			 movb (r0)+,(r3)+
+			 movb SPACE,(r3)+
+			 dec r2
+			 br rowsloop
+			 
+			 inc r1
+			 br colsloop
+theEnd:	     mov (sp)+,r3
+			 mov (sp)+,r2
+			 mov (sp)+,r1
+			 mov (sp)+,r0
+			 rts pc
+newIteration:mov insertRows,r2
+			 dec r3
+			 movb #0,(r3)
+			 mov r3,currenToPri
+			 inc r3
+			 mov insertCols,ToPrihelp
+			 sub #1,ToPrihelp
+			 sub insertCols,currenToPri
+			 sub ToPrihelp,currenToPri
+			 mov currenToPri,-(sp)
+			 jsr pc,printf
+			 add #2,sp
+			 jsr pc,endl
+			 dec r1
+			 br colsloop
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+endl: mov #endStr,-(sp)
+	  jsr pc,printf
+	  add #2,sp
+	  rts pc
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+printf:mov r0,-(sp)
+	   mov r1,-(sp)
+loop1: bis #100,@#tps
+	   iot
+toHere:wait
+	   cmp r1,#0
+	   beq finish
+	   br toHere
+finish:clr @#tpb
+	   clr @#tps
+	   mov (sp)+,r1
+	   mov (sp)+,r0
+	   movb #0,currP
+	   rts pc	   
+printing:movb currP,r1;r1 holds the 
+	     mov 12(sp),r0; r0 hold the EA of the wanted message
+		 add r1,r0
+		 movb @r0,r1;r1 hold the wanted char to print
+		 cmpb r1,#0 ;if its the end of the string 
+		 beq done
+		 movb r1,@#tpb
+		 inc currP
+done:	 rti
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+scanf:mov #0,lastInputLen
+	  mov r0,-(sp)
+	  mov r1,-(sp)
+	  mov r2,-(sp)
+	  mov 10(sp),r2;r2 contains the address of the str we write into
+toH:  mov r2,r1
+	  bis #101,@#tks; turn on the keyboard
+	  wait
+	  cmp r0,BS;if the char was BS
+	  beq back
+	  cmp r0,ENTER;if the char was ENTER
+	  beq End
+	  inc inserted
+	  br toH
+back:tstb @#tps
+	 bpl back
+	 movb BS,@#tpb
+	 dec inserted
+	 dec lastInputLen
+tag: tstb @#tps
+	 bpl tag
+	 movb SPACE,@#tpb
+tag2:tstb @#tps
+	 bpl tag2
+	 movb BS,@#tpb
+	 mov r2,r1
+	 add inserted,r1
+	 movb #0,@r1
+	 br toH
+End:clr @#tks
+	mov #0,inserted
+	mov (sp)+,r2
+	mov (sp)+,r1
+	mov (sp)+,r0
+	rts pc	
+checker:mov r2,r1
+	    add inserted,r1
+	    movb @#tkb,r0;the current char that was inserted by keyboard
+		cmp r0,BS
+		beq goBack
+		cmp r0,ENTER
+		beq goBack
+		inc lastInputLen
+		br printloop
+goBack:		rti
+printloop:tstb @#tps
+		  bpl printloop
+		  movb r0,@#tpb;print the inserted char to the printer
+		  movb r0,(r1)+
+		  br goBack
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Clock:dec counterClockRate
+	  beq decGameTime
+	  rti
+decGameTime:tst counterGameTime
+			beq timesUp
+		    dec counterGameTime
+			mov rate,counterClockRate
+			rti
+timesUp:mov #MStime,-(sp)
+		jsr pc,printf
+		add #2,sp
+		halt
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+.=torg+9000
+squareStr:.blkw 15.
+insertRows:.word 0.
+insertCols:.word 0.
+InitialBoard:	.blkw 8 ; max size of the board is 4x4
+endStr:.byte 10.,13.,0.
+MS1:.ascii<Please enter number of rows:\0>
+.even
+MS2:.ascii<Please enter number of columns:\0>
+.even
+MS3:.ascii<Please enter game duration in seconds:\0>
+.even
+MS4:.ascii<Please enter the sliding puzzle:\0>
+.even
+MS5p1:.ascii<We are all set. Total time: \0>
+.even
+MS5p2:.ascii< sec\0>
+.even
+MS5p3:.ascii<Press Enter key when you are ready...\0>
+.even
+MS6:.ascii<Current Board:\0>
+.even
+MS7:.ascii<Please enter your move:\0>
+.even
+MStime:.ascii<Time's up. Game Over!\0>
+.even
+okGoEnter:.byte 0.
+.even
+board17:.blkw 8.
+.even
+boardToPrint:.blkw 8.
+.even
+currenToPri:.word 0.
+.even
+ToPrihelp:.word 0.
+.even
+GameTimeStr:.blkw 25.
+.even
+Gametime:.word 0.
+.even
+lastInputLen:.word 0.
+.even
+ENTER:.byte 13.
+.even
+SPACE: .byte 32.; ascii decimal for space
+.even
+BS: .byte 8.; ascii decimal for back space
+.even
+CR: .byte 13. ; ascii decimal for CR
+.even
+LF: .byte 10.  ; ascii decimal for LF
+.even
+currP:.byte 0.
+.even
+inserted:.byte 0.
+.even
+StrHelp:.blkw 25.
+.even
+lineStr:.byte 10.,13.,0.
+.even
+zero:.ascii<0>
+.even
+;;;;;;;;;;;;;
+counterClockRate:.word 0.
+counterGameTime:.word 0.
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+rate: .word 1000.

@@ -1,0 +1,113 @@
+        . = torg+1000
+sum: .word 0.
+main: mov Height,r0
+	  mul Width,r0
+	  mov r1,r3
+	  sub #1,r3 ;r3 is number of elements in array
+loop1: add r1,sum ;sums the sum
+	   sob r1,loop1
+	   mov NumMoves,r5
+	mov #Moves,r2 ;caculate the current move
+loop2:  mov Height,r0
+	mul Width,r0
+	;r0 is now free to use until next iteration
+	mov r1,r3
+	sub #1,r3
+	mov sum,r1
+	;now we have the num of elements in r3 and the sum in r1
+	add #InitialBoard,r0
+loop3:  movb (r0)+,r4 ;finds the empty index
+        sub r4,r1
+        sob r3,loop3 
+	;r4 and r3 is now free to use 
+        movb (r2)+,r0
+	
+	cmp r0,#'L
+	beq LeftMove
+	cmp r0,'R
+	beq RightMove
+	cmp r0,'U
+	beq UpMove
+	cmp r0,'D
+	beq DownMove
+	
+	cmp r5, #0 ; if num of moves is 0 jump to isSolved
+	beq isSolved
+	
+UpMove: mov r1,r0
+	mov Height,r3
+	mul Width,r3
+	sub 1.,r4
+	cmp r0,r4
+	bmi ErrorNotValid
+	add #InitialBoard,r0
+	movb InitialBoard(r4),r0
+	sub 1.,r5
+	jmp loop2
+
+DownMove: mov r1,r0
+	mov r0,r4
+	sub 1.,r0
+	sub Width,r4
+	sub 1.,r4
+	bmi ErrorNotValid
+	add #InitialBoard,r0
+	movb InitialBoard(r4),r0
+	sub 1.,r5
+	jmp loop2
+
+LeftMove: mov r1,r0
+	mov r1,r4
+	sxt r0
+	div Width,r0
+	beq ErrorNotValid
+	mov r4,r1
+	sub 1.,r4
+	add #InitialBoard,r4
+	movb InitialBoard(r1),r4
+	sub 1.,r5
+	jmp loop2
+
+RightMove: mov r1,r0
+	mov r1,r4
+	sxt r0
+	div Width,r0
+	sub 1.,r0
+	beq ErrorNotValid
+	mov r4,r1
+	sub 2.,r1
+	sub 1.,r4
+	add #InitialBoard,r4
+	movb InitialBoard(r1),r4
+	sub 1.,r5
+	jmp loop2
+
+
+	sub 1.,r5
+	jmp loop2
+	
+isSolved: mov Height,r3
+	  mul Width,r3
+	  sub 1., r4 ; r4 holds the biggest num
+	  mov r4, r3 ; r3 holds the index on the board
+	  
+loop4: movb InitialBoard(r3),r5
+	cmp r4,r5 ; checks of the num matches his index on the board
+	bne ErrorLegal
+	sub 1., r4
+	sob r3,loop4
+	mov #'S,Output
+	jmp End
+	
+ErrorLegal: mov #'L,Output
+jmp End
+
+ErrorNotValid: mov #'I,Output
+End: halt
+
+InitialBoard: .byte 2, 5, 3, 4, 6, 9., 7, 8.
+NumMoves: .word 4
+Moves: .ascii <LULU>
+Width: .word 3
+Height: .word 3
+Output: .ascii <S>

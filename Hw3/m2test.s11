@@ -1,0 +1,284 @@
+mission2: ; input - root address (label) via stack
+	tst 2(sp) ; check if the current node is NIL
+	beq nilPtr ; if NIL - return 0
+	
+	mov 2(sp), r0
+	mov (r0), -(sp) ; current node moves length
+	mov 2(r0), r2 ; moves address
+	
+setArray: 
+	mov MovesLen, r1 ; r1 is an iterator of the moves string
+	movb (r2)+, Moves(r1)
+	inc r1
+	cmp r1, (sp) ; compares the counter of the moves equal to the current node moves length
+	bne setArray ; if not equal - repeat
+	add (sp), MovesLen  ; else continue
+	
+	
+	tst 4(r0)  ; check if the initial board address is NIL
+	beq leftSon ; if NIL - move to left son
+	mov Moves, -(sp) ; moves address
+	mov #MovesLen, -(sp) ; moves length
+	mov 4(r0), -(sp) ; board adress
+	jsr pc, findInit
+	
+nilPtr: 
+	mov #0, 4(sp); if so – return 0 and exit
+	br exit
+
+leftSon: 
+	mov 6(r0), r0 ; left son node address
+	mov r0, -(sp) ; 
+	jsr pc, mission2 ; call mission2 to handle the left son
+	
+	tst (sp) ; if left son is NIL - continue to the right son
+	beq rightSon
+	
+rightSon: 
+	mov 8(r0), r0 ; left son node address
+	mov r0, (sp) ; right son node address instead of left son node address
+	jsr pc, mission2 ; call mission2 to handle the right son
+	
+	tst (sp)
+	beq exit
+
+exit: 
+	mov (sp)+,r2 
+	mov (sp)+,r1 
+	mov (sp)+,r0
+	tst (sp)+ ; clean the local variable
+	rts pc
+
+
+findInit: 
+	mov r0,-(sp) ; saves the registers in stack
+	mov r1,-(sp)
+	mov r2,-(sp)
+	mov r3,-(sp)
+	mov r4,-(sp)
+	mov Height,r0 ; calculates the size of the board
+	mul Width,r0
+	mov r1, r0
+	sub #1, r0
+	mov #auxBoard,r1 ; auxilary board adress
+	mov 14.(sp),r2 ; moves length
+	mov 16.(sp),r3 ; moves adress
+	mov 12.(sp), boardAddress
+	mov #currMove, r4 ; label that holds the current move
+	add r0, r1
+	clrb(r1)
+setBoard: ; sets the "final" board
+	sub #1, r1
+	movb r0,(r1)
+	sob r0, setBoard
+reverseMoves: ; finds the latest move
+	add r2,r3
+	loop:
+		movb -(r3),r0 ; taking care of the latest move
+		cmp r0,#'L
+			beq left
+		cmp r0,#'R
+			beq right
+		cmp r0,#'U
+			beq up
+		cmp r0,#'D
+			beq down
+			
+		down: ; makes the opposit move to "D"
+		mov #'U, (r4)
+		jsr r5, makeMovs ; use makeMovs to make the opposit move
+		.word auxBoard
+		.word currMove
+		.word movLen
+		sob r2, loop
+		br copyAux
+		
+		up: ; makes the opposit move to "U"
+		mov #'D, (r4)
+		jsr r5, makeMovs ; use makeMovs to make the opposit move
+		.word auxBoard
+		.word currMove
+		.word movLen
+		sob r2, loop
+		br copyAux
+		
+		right: ; makes the opposit move to "R"
+		mov #'L, (r4)
+		jsr r5, makeMovs ; use makeMovs to make the opposit move
+		.word auxBoard
+		.word currMove
+		.word movLen
+		sob r2, loop
+		br copyAux
+		
+		left: ; makes the opposit move to "L"
+		mov #'R, (r4)
+		jsr r5, makeMovs ; use makeMovs to make the opposit move
+		.word auxBoard
+		.word currMove
+		.word movLen
+		sob r2, loop
+		br copyAux
+		
+copyAux: ; copies the board to the destination address
+	mov #auxBoard, -(sp) ; source board
+	mov boardAddress, -(sp) ; board destination
+	mov Height,r0 ; calculates the size of the board
+	mul Width,r0
+	mov r1, r0
+	sub #1, r0
+	add r0, r0 ; size of the board in bytes
+	mov r0, -(sp) ; board size
+	jsr pc, copyArr
+	
+	clr r0
+	cmp r0, (sp)+
+	beq Error
+	bne Finish
+	Error: ; if there's an error, will return board an empty board
+		mov Height,r0
+		mul Width,r0
+		sub #1, r0
+		add r0, r1
+		loop22:
+		movb 0,(r1)
+		sob r1, loop22
+
+Finish:
+	mov (sp)+,r4
+	mov (sp)+,r3 
+	mov (sp)+,r2 
+	mov (sp)+,r1 
+	mov (sp)+,r0
+	rts pc	
+	
+auxBoard:.blkw 256.
+currMove: .word 0
+boardAddress: .word 0
+movLen: .word 1
+	
+	 makeMovs:mov r0,-(sp)
+		 mov r1,-(sp)
+		 mov r2,-(sp)
+		 mov r3,-(sp)
+		 mov r4,-(sp)
+		 mov 0.,-(sp)
+		 mov (r5)+,-(sp)
+		 mov (r5)+,-(sp)
+		 mov @(r5)+,-(sp)
+		 add #12,22(sp)
+		 mov Height,r0
+		 mul Width,r0
+		 mov r1,-(sp)
+		 mov r1,r3
+		 sub #1,r3
+loop1:add r1,8(sp)
+	  sob r1,loop1
+loop2:mov 4(sp),r0
+	  add #1,4(sp)
+	  movb (r0),r2
+	  cmp 2(sp),#0
+	  beq allLegal
+	  mov 8(sp),r1
+	  mov (sp),r3
+	  dec r3
+	  mov 6(sp),r0
+loop3:movb (r0)+,r4
+	  sub r4,r1
+	  sob r3,loop3
+	  
+	  cmp r2,#'L
+	  beq LeftMove
+	  cmp r2,#'R
+	  beq RightMove
+	  cmp r2,#'U
+	  beq UpMove
+	  cmp r2,#'D
+	  beq DownMove
+	  
+UpMove: mov r1,r0
+	add Width,r0
+	mov (sp),r3
+	cmp r0,r3
+	bgt ErrorNotValid
+	mov r0,r3 
+	mov r1,r0
+	mov r3,r1
+	mov 6(sp),r4
+	jmp DoMove
+DownMove: mov r1,r0
+	sub Width,r1
+	tst r1
+	ble ErrorNotValid
+	mov 6(sp),r4
+	jmp DoMove
+LeftMove: mov r1,r0
+	mov r1,r4
+	div Width,r0
+	cmp 0.,r1
+	beq ErrorNotValid
+	mov r4,r0
+	mov r4,r1
+	inc r1
+	mov 6(sp),r4
+	jmp DoMove
+RightMove:mov r1,r0
+	mov r1,r4
+	sxt r0
+	div Width,r0
+	dec r1;sheerit 
+	cmp 0.,r1
+	beq ErrorNotValid
+	mov r4,r0
+	mov r4,r1
+	dec r1
+	mov 6(sp),r4
+	jmp DoMove
+DoMove:cmpb @r4,r1
+	beq ContinueDo
+	inc r4
+	jmp DoMove
+ContinueDo:movb r0,(r4)
+	dec 2(sp)
+	jmp loop2
+allLegal:add #12,sp
+	mov (sp)+,r4
+	mov (sp)+,r3
+	mov (sp)+,r2
+	mov (sp)+,r1
+	mov (sp)+,r0
+	mov #1,2(sp)
+	rts r5
+ErrorNotValid:add #12,sp
+	mov (sp)+,r4
+	mov (sp)+,r3
+	mov (sp)+,r2
+	mov (sp)+,r1
+	mov (sp)+,r0
+	mov #0,2(sp)
+	rts r5
+
+copyArr:mov r1,-(sp);saves the registers
+		mov r2,-(sp)
+		mov r3,-(sp)
+		mov 10(sp),r1 ;takes out the given parameters
+		mov 12(sp),r2
+		mov 14(sp),r3
+loopcopy:movb (r3)+,(r2)+ ;copies the values, byte by byte
+	 sub #2,r1
+	 cmp #0,r1
+	 bmi loopcopy
+	 mov r3,(sp)+;restore the registers original values
+	 mov r2,(sp)+
+	 mov r1,(sp)+
+	 rts pc
+
+
+. = torg + 5000
+
+newBoard: .byte 6, 1, 1, 1, 1, 1, 3, 1
+NumMoves: .word 5
+Moves: .ascii <LURUL>
+.even
+Width: .word 3
+Height: .word 3

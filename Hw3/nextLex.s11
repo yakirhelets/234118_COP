@@ -1,0 +1,47 @@
+nextLex:
+	mov r0,-(sp)
+	mov r1,-(sp)
+	mov r2,-(sp)
+	mov r3,-(sp)
+	mov 8(sp),r1 ; string adress
+	mov 10(sp),r2 ; string length
+	mov #1, r3
+loopLex:
+	movb r1(r0), r2
+	
+	cmp r3, 0
+	beq Exit
+	cmp r1, 0
+	beq Exit
+	
+	cmp r2,'D
+	beq incDown
+	cmp r2,'L
+	beq incLeft
+	cmp r2,'R
+	beq incRight
+	cmp r2,'U
+	beq incUp
+incDown:
+	mov #'L, (r0)
+	clr r3
+	sob r1, loopLex
+incLeft:
+	mov #'R, (r0)
+	clr r3
+	sob r1, loopLex
+incRight:
+	mov #'U, (r0)
+	clr r3
+	sob r1, loopLex
+incUp:
+	mov #'D, (r0)
+	inc r3 
+	sob r1, loopLex
+Exit:
+	mov (sp)+,r3 
+	mov (sp)+,r2 
+	mov (sp)+,r1 
+	mov (sp)+,r0
+	rts pc
+	

@@ -1,0 +1,592 @@
+.=torg+1000
+main:mov #main,sp   ;initialize the stack
+   	 mov Height,r0
+	 mul Width,r0
+	 dec r1
+  	 mov r1,Size ;moving the array sizr to Size
+	 
+	 mov #MovesTree, -(sp) ; tree root address
+	 jsr pc, mission2
+	 ;doing mission2
+	 
+	 mov #'L,r1	
+	 movb r1,Output ;putting a default value in Output
+	 mov #ArrMovs,r3
+	 mov #MovesTree,-(sp)
+	 mov #InitialBoard,-(sp)
+	 mov #MovesTree,rootMark
+	 mov pc,4(sp)
+	 add #14,4(sp)
+	 jsr pc,m1 ;until here everything was preperation to mission1 
+	 ;doing mission1
+	 jsr pc,m3 
+	 jmp End
+	 ;doing mission3 and jumping to the end
+	 
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+m1:mov #ArrMovs,r3 ;we want to copy the moves array into a temp array
+   add MovesLnHelp,r3
+   mov #MovesLnHelp,r1
+   mov 4(sp),r0 	
+   add @r0,@r1 
+   mov 2(r0),-(sp)
+   mov r3,-(sp)
+   mov (r0),r2
+   mul #2,r2
+   mov r3,-(sp)
+   jsr pc,copyArr ;does the copy action 
+   add #6,sp ;"cleaning" the stack
+   cmp 6(r0),10(r0);checking if the left and right sons address is equal, if it is. means they both 0 so its a leaf
+   beq isLeaf
+   add #4,sp;cleaning the stack
+leftSon:cmp #0,6(r0); checking if the left son exists
+		beq rightSon
+keepLeft:mov 6(r0),-(sp) ;preparing for recursion with the left son
+		 mov #0,6(r0)
+		 mov #ArrBoard,-(sp)
+		 mov #MovesLnHelp,r1
+		 jsr pc,m1 ;recursive call with the left son
+backRightSon:mov (sp),r0 ;in order to "fall back" in the tree into the higher vertices
+			 sub (r0),MovesLnHelp
+			 add #2,sp
+			 cmp r0,rootMark;checks if we visit the root
+			 beq isRoot
+rightSon:cmp #0,10(r0) ;if there isnt any right son, fall back to the previous vertice
+		 beq backRightSon
+keepRight:mov r0,-(sp) ;preparing for recursion with the right son
+		  mov 10(r0),-(sp)
+		  mov 10(r0),r1
+	      mov #0,10(r0)
+		  mov r1,r0
+		  mov #ArrBoard,-(sp)
+	      jsr pc,m1 ;recursive call with the right son
+isLeaf:mov #ArrMovs,-(sp);if its a leaf, preparing to copy to current collected moves 
+	   mov #MovsHelp,-(sp)
+	   mov MovesLnHelp,r0
+	   mul #2,r0
+	   mov r1,-(sp)
+	   jsr pc,copyArr ;copy the moves of all the vertices until the leaf into the movs array well check
+	   add #6,sp; cleaning the stack
+	   mov #InitialBoard,-(sp)
+	   mov #ArrBoard,-(sp)
+	   mov Size,r2
+	   mul #2,r2
+	   mov r3,-(sp)
+	   jsr pc,copyArr;making of copy of the original board
+	   add #6,sp;cleaning
+	   mov pc,r5
+	   jsr r5,makeMovs;doing the change according to the moves in ArrMovs. copied from the MovsHelp
+	   .word ArrBoard
+	   .word ArrMovs
+	   .word MovesLnHelp
+	   cmp #1,(sp)+ ;checks if all the actions were legal
+	   beq checkS
+	   cmpb Output,#'S;if the actions wasnt legal and theres 's' in output. doesnt write I
+	   bne writeI
+	   mov 2(sp),r0
+	   add #2,sp
+	   jmp leftSon ;keep moving in the tree
+checkS:mov #ArrBoard,r4
+	   jsr pc,checkSol;checks if the current changed array is solved
+	   cmp #1,(sp)+;checks the func returns value 
+	   beq writeS;write s if its true
+	   mov (sp),r0
+	   add #2,sp
+	   jmp leftSon;keeps going along the tree
+writeS:movb #'S,Output;write s in Output
+	   mov #MovsHelp,-(sp)
+	   mov #Moves,-(sp)
+	   mov MovesLnHelp,r0
+	   mov r0,MovesLen
+	   mul #2,r0
+	   mov r1,-(sp)
+	   jsr pc,copyArr;copy the moves into the wanted Moves array for the mission output
+	   add #6,sp;cleaning
+	   mov (sp)+,r0
+	   jmp rightSon;keeps going along the tree
+writeI:movb #'I,Output;writes I and putting 0 in the missions output of the moves number
+	   mov #0,MovesLen
+	   mov 2(sp),r0
+	   mov (sp),r1
+	   add #2,sp
+	   jmp rightSon;keeps going along the tree
+isRoot:sub #1,rootVisits;dec one visit, notice the allowed visits num is 2! then it means we finished going through the tree
+	   cmp rootVisits,#0
+	   beq End1
+	   jmp rightSon
+End1:rts pc ;returns to the main
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+mission2: ; input - root address (label) via stack
+	mov r0, -(sp)
+	mov r1, -(sp)
+	mov r2, -(sp)
+	tst 8.(sp) ; check if the current node is NIL - root address
+	beq exit2 ; if NIL - return 0
+	mov 8.(sp), r0 ; r0 holds ptr to the node
+	mov (r0),-(sp) ;  stack holds the moves length
+	add movelen2, (sp) ; adds the previous node move length
+	mov 2(r0),-(sp) ; stack holds the moves string address
+	mov (sp), r2 ; r2 holds the address to the moves string
+	
+	mov #0, r1 ; r1 is a counter of the moves string
+setArray: ; sets the moves array in movearr2
+	add movelen2, r1
+	movb (r2)+, movsarr2(r1) ; moves the 0<=i<=(r0) move to movsarr[movelen2+i]  
+	inc r1
+	sub movelen2, r1 ; we do this in order to compare
+	cmp r1, (r0) ; compares the counter of the moves equal to the current node moves length
+	bne setArray ; if not equal - repeat
+	add (r0), movelen2 ; calculates the total number of moves from the root to the current node
+	
+	mov 4(r0), -(sp) ; push board address
+	
+	checkBoard2:
+	tst (sp)  ; check if the initial board address is NIL
+	beq checkLeftSon2 ; if NIL - move to left son										
+				;else - find initial board via findInit
+	mov #movsarr2, -(sp) ; moves address
+	mov movelen2, -(sp) ; moves length
+	mov 4(sp), -(sp) ; board adress
+	jsr pc, findInit
+	add  #6., sp ; clean after findInit
+
+	
+checkLeftSon2:
+	mov 6(r0), -(sp) ; push left son address
+	cmp #0, (sp) ; check if the left son ptr is empty
+	bne leftSon2 ; if not handle the left son
+	tst (sp)+
+	beq checkRightSon
+	
+leftSon2:
+
+	jsr pc, mission2 ; call mission2 to handle the left son
+	add  #2, sp ; clean after mission2
+
+		
+checkRightSon:
+	mov 8.(r0), -(sp) ; push right son address
+	cmp #0, 8.(r0) ; check if the right son ptr is empty	
+	bne continueRightSon
+	tst (sp)+
+	beq exit2 ; if empty return to father
+	
+continueRightSon: 
+
+	jsr pc, mission2 ; call mission2 to handle the right son
+	add  #2, sp ; clean after mission2
+
+
+exit2: 
+	add  #6, sp ; clean boardAddress
+	sub (r0), movelen2
+	mov (sp)+,r2 
+	mov (sp)+,r1 
+	mov (sp)+,r0
+	rts pc
+	
+
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+m3:mov Height,r0
+   mul Width,r0
+   dec r1
+   mov r1,boardSize;putting size in boardSize label
+   mov #ParMoves,r0;preparing all the values in the wanted registers
+   mov #tempParMovs,r2
+   mov #missingMovs,r3
+   mov ParLen,r4
+   jmp loop ;first we want to find the num of zeros in the given moves array
+loopDec:dec r4
+	    mov r1,(r2)+
+loop:movb(r0)+,r1;checking if the current move is "empty" - means 0
+	 cmp r1,0.
+	 bne loopDec;if its not,keep going
+	 inc zeroNum
+	 movb #'D,(r3);put the lowest move value in the help array. 
+	 mov r3,(r2)+ ;the the ADDRESS of this move in the helper array the contains all the moves, and the addresses of the places to replace the zeros
+	 add #1,r3
+	 sob r4,loop
+stopLoop:cmp r4,#1;checking if nextLex checked all the options
+	     beq End;if yes, jump to the end
+		 jmp createTry;finish and start checking moves
+findLoop:mov #Board2,-(sp)
+		 mov #tryBoard,-(sp)
+		 mov boardSize,r0
+		 mul #2,r0
+		 mov r1,-(sp)
+		 jsr pc,copyArr;copy the array with the moves and the changed moves addresses into a new array that will be implemented on the board
+		 add #6,sp
+		 mov pc,r5
+		 mov pc,-(sp)
+		 jsr r5,makeMovs;make the moves
+		 .word tryBoard
+		 .word tryArr
+		 .word ParLen
+		 cmp #1,(sp)+;check if all the moves were legal
+		 beq checkIfTrue
+keep:mov #missingMovs,-(sp);if not, use nextLex to change the "changing" moves
+	 mov zeroNum,-(sp)
+	 jsr pc,nextLex
+	 add #4,sp
+	 jmp stopLoop ;and try again
+createTry:mov #tempParMovs,r0
+		  mov #missingMovs,r1
+		  mov #tryArr,r2
+		  mov ParLen,r3
+loopCopyMov:mov (r0)+,r4;if the move is not zero, just copy its value
+		    cmp r4,#'D
+			beq regular
+			cmp r4,#'L
+			beq regular
+			cmp r4,#'R
+			beq regular
+			cmp r4,#'U
+			beq regular
+			movb (r1)+,(r2)+ ;otherwise copy the address of the place in the "changed" array
+			sob r3,loopCopyMov
+			jmp findLoop; keep going with the moves
+regular:movb r4,(r2)+;regular copy of a move value
+	    sob r3,loopCopyMov
+		jmp findLoop
+checkIfTrue:mov #tryBoard,r4
+			mov pc,-(sp)
+			jsr pc,checkSol;checks if the current state of the board is solved
+			cmp #1,(sp)+
+			beq solved
+			jmp keep
+solved:mov #ParMoves,r3
+	   mov ParLen,r1
+	   mov #missingMovs,r0
+	   jmp solveLoop
+decSolveLoop:dec r1; the next sections copies the values of the moves that solves the board , by order, into the 0's places in the original ParMoves
+			 movb (r0)+,(r3)+
+			 cmp r1,#0
+			 beq back
+solveLoop:cmpb (r3),#0
+		  beq decSolveLoop
+		  inc r3
+		  sob r1,solveLoop
+back:rts pc	  ;return to main
+End:halt;finish the program
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+findInit: 
+	mov r0,-(sp) ; saves the registers in stack
+	mov r1,-(sp)
+	mov r2,-(sp)
+	mov r3,-(sp)
+	mov r4,-(sp)
+	mov Height,r0 ; calculates the size of the board
+	mul Width,r0
+	mov r1, r0
+	sub #1, r0
+	mov #auxBoard,r1 ; auxilary board adress
+	mov 12.(sp), boardAddress ; destination board address
+	mov 14.(sp),r2 ; moves length
+	mov 16.(sp),r3 ; moves adress
+	mov #currMove, r4 ; label that holds the current move
+	add r0, r1
+	clrb(r1)
+setBoard: ; sets the "final" board
+	sub #1, r1
+	movb r0,(r1)
+	sob r0, setBoard
+reverseMoves: ; finds the latest move
+	add r2,r3
+	loopq:
+		movb -(r3),r0 ; taking care of the latest move
+		cmp r0,#'L
+			beq left
+		cmp r0,#'R
+			beq right
+		cmp r0,#'U
+			beq up
+		cmp r0,#'D
+			beq down
+		down: ; makes the opposit move to "D"
+		mov #'U, (r4)
+		jsr r5, makeMovs ; use makeMovs to make the opposit move
+		.word auxBoard
+		.word currMove
+		.word movLen
+		sob r2, loopq
+		br copyAux
+		up: ; makes the opposit move to "U"
+		mov #'D, (r4)
+		jsr r5, makeMovs ; use makeMovs to make the opposit move
+		.word auxBoard
+		.word currMove
+		.word movLen
+		sob r2, loopq
+		br copyAux
+		right: ; makes the opposit move to "R"
+		mov #'L, (r4)
+		jsr r5, makeMovs ; use makeMovs to make the opposit move
+		.word auxBoard
+		.word currMove
+		.word movLen
+		sob r2, loopq
+		br copyAux
+		left: ; makes the opposit move to "L"
+		mov #'R, (r4)
+		jsr r5, makeMovs ; use makeMovs to make the opposit move
+		.word auxBoard
+		.word currMove
+		.word movLen
+		cmp #0, (sp) ; checks if the current move was legal
+		beq Error2
+		sob r2, loopq
+		br copyAux
+copyAux: ; copies the board to the destination address
+	mov #auxBoard, -(sp) ; source board
+	mov boardAddress, -(sp) ; board destination
+	mov Height,r0 ; calculates the size of the board
+	mul Width,r0
+	mov r1, r0
+	sub #1, r0
+	add r0, r0 ; size of the board in bytes
+	mov r0, -(sp) ; board size
+	jsr pc, copyArr
+	clr r0
+	tst (sp)+ ; pops board size
+	tst (sp)+ ; pops boardAddress
+	tst (sp)+ ; pops #auxBoard
+	beq Error2
+	bne Finish
+	Error2: ; if there's an error, will return board an empty board
+		mov Height,r0
+		mul Width,r0
+		sub #1, r0
+		add r0, r1
+		loop22:
+		movb 0,(r1)
+		sob r1, loop22
+Finish: ; return from findInit
+	mov (sp)+,r4
+	mov (sp)+,r3 
+	mov (sp)+,r2 
+	mov (sp)+,r1 
+	mov (sp)+,r0
+	rts pc
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+copyArr:mov r1,-(sp);saves the registers
+		mov r2,-(sp)
+		mov r3,-(sp)
+		mov 10(sp),r1 ;takes out the given parameters
+		mov 12(sp),r2
+		mov 14(sp),r3
+loopcopy:movb (r3)+,(r2)+ ;copies the values, byte by byte
+	 sub #2,r1
+	 cmp #0,r1
+	 bmi loopcopy
+	 mov (sp)+, r3;restore the registers original values
+	 mov (sp)+, r2
+	 mov (sp)+, r1
+	 rts pc
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+makeMovs:mov r0,-(sp);saving registers
+		 mov r1,-(sp)
+		 mov r2,-(sp)
+		 mov r3,-(sp)
+		 mov r4,-(sp)
+		 mov 0.,-(sp)
+		 mov (r5)+,-(sp);takes the inline given parameters
+		 mov (r5)+,-(sp)
+		 mov @(r5)+,-(sp)
+		 add #12,22(sp);make sure we return to the right place, after the inline parameters
+		 mov Height,r0
+		 mul Width,r0
+		 mov r1,-(sp);puts the size of the board in the stack
+		 mov r1,r3
+		 sub #1,r3
+loop1:add r1,8(sp);loop1 finds the empty place in the board
+	  sob r1,loop1
+loop2:mov 4(sp),r0;as we use this loop a few times, checks that the values every iteration are valid
+	  add #1,4(sp)
+	  movb (r0),r2
+	  cmp 2(sp),#0
+	  beq allLegal;jumps if they are
+	  mov 8(sp),r1
+	  mov (sp),r3
+	  dec r3
+	  mov 6(sp),r0
+loop3:movb (r0)+,r4;now we have the move in r2, the loop3 finds it and does it
+	  sub r4,r1
+	  sob r3,loop3
+	  cmp r2,#'L
+	  beq LeftMove
+	  cmp r2,#'R
+	  beq RightMove
+	  cmp r2,#'U
+	  beq UpMove
+	  cmp r2,#'D
+	  beq DownMove
+UpMove:mov r1,r0;does the up move while checking the array limits
+	   add Width,r0
+	   mov (sp),r3
+	   cmp r0,r3
+	   bgt ErrorNotValid
+	   mov r0,r3 
+	   mov r1,r0
+	   mov r3,r1
+	   mov 6(sp),r4
+	   jmp DoMove
+DownMove:mov r1,r0;doing down move while checking the array limits
+		 sub Width,r1
+		 tst r1
+		 ble ErrorNotValid
+		 mov 6(sp),r4
+		 jmp DoMove
+LeftMove:mov r1,r0;doing the left move while checking the move is legal
+		 mov r1,r4
+		 div Width,r0
+		 cmp 0.,r1
+		 beq ErrorNotValid
+		 mov r4,r0
+		 mov r4,r1
+		 inc r1
+		 mov 6(sp),r4
+		 jmp DoMove
+RightMove:mov r1,r0;doing the right move while checking the move is legal
+		  mov r1,r4
+		  sxt r0
+		  div Width,r0
+		  dec r1;sheerit 
+		  cmp 0.,r1
+		  beq ErrorNotValid
+		  mov r4,r0
+		  mov r4,r1
+		  dec r1
+		  mov 6(sp),r4
+		  jmp DoMove
+DoMove:cmpb @r4,r1;find the place whos value we want to change
+	   beq ContinueDo
+	   inc r4
+	   jmp DoMove
+ContinueDo:movb r0,(r4);changes the value. -means doing the move
+		   dec 2(sp)
+		   jmp loop2
+allLegal:add #12,sp;cleaning the stack
+		 mov (sp)+,r4;restore the registers
+		 mov (sp)+,r3
+		 mov (sp)+,r2
+		 mov (sp)+,r1
+		 mov (sp)+,r0
+		 mov #1,2(sp);and return 1, means all moves were legal
+		 rts r5
+ErrorNotValid:add #12,sp;cleaning the stack
+			  mov (sp)+,r4;restore the registers
+			  mov (sp)+,r3
+			  mov (sp)+,r2
+			  mov (sp)+,r1
+			  mov (sp)+,r0
+			  mov #0,2(sp);return 0 , means not all moves were legal
+			  rts r5
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+checkSol:mov r0,-(sp);save the registers value
+	     mov r1,-(sp)
+		 mov r2,-(sp)
+		 mov Height,r0
+		 mul Width,r0
+		 mov r1,r2
+		 dec r1
+		 add r1,r4
+loop4:movb -(r4),r0;check every time if the index of the array equal its value
+	  cmp r1,r0
+	  bne Error;if not, jump
+	  dec r1
+	  sob r2,loop4
+	  mov (sp),r2;restore registers
+	  mov 2(sp),r1
+	  mov 4(sp),r0
+	  add #6,sp
+	  mov #1,2(sp);return 1 , means the board it solved
+	  rts pc
+Error:mov (sp),r2;restore registers
+	  mov 2(sp),r1
+	  mov 4(sp),r0
+	  add #6,sp
+	  mov #0,2(sp);return 0- means the board is not solved
+	  rts pc
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+nextLex:
+	mov r0,-(sp);save the registers
+	mov r1,-(sp)
+	mov r2,-(sp)
+	mov r3,-(sp)
+	mov r4,-(sp)
+	mov r5,-(sp)
+	mov 16(sp),r3;take the given parameters
+	mov 18(sp),r0
+	mov r3,r4
+	dec r4
+	mov r4,r5;r5 hold the value the represents how much steps "into" the moves string we check
+loopLex:mov r0,r1
+		add r4,r1
+		movb (r1),r2
+		cmp r3,#0;if the length is 0, exit
+		beq Exit
+		cmp r2,#'D;finds the current move 
+		beq incDown
+		cmp r2,#'L
+		beq incLeft
+		cmp r2,#'R
+		beq incRight
+		cmp r2,#'U
+		beq incUp
+incDown:movb #'L,(r1);change D to L and return
+		clr r3
+		jmp loopLex
+incLeft:movb #'R,(r1);change L to R and return
+		clr r3
+		jmp loopLex
+incRight:movb #'U,(r1);change R to U and return
+		 clr r3
+		 jmp loopLex
+incUp:movb #'D,(r1);change U to D and if this is the "last" move, meaning all moves are U , return 1
+	  dec r3
+	  beq returnOne
+	  dec r5;go one step "lower" into the move string
+	  beq oneMore
+	  sub r5,r4
+	  jmp loopLex;checking the next place
+oneMore:dec r4
+		jmp loopLex
+Exit:
+put0:mov #0,r4;returns 0
+	jmp keep2
+returnOne:mov #1,r4;returns 1
+keep2:mov (sp)+,r5;restore the registers
+	  add #2,sp
+	  mov (sp)+,r3 
+	  mov (sp)+,r2 
+	  mov (sp)+,r1 
+	  mov (sp)+,r0
+	  rts pc
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+; variables
+
+boardSize:.byte 0
+.even
+ArrBoard:.blkw 256.
+ArrMovs:.blkw 5
+tempParMovs:.blkw 10.
+missingMovs:.blkw 5
+zeroNum:.byte 0.
+.even
+tryArr:.blkw 5		
+tryBoard:.byte 256.
+.even
+rootVisits:.word 2.
+rootMark:.word 0.
+Size:.word 0.
+MovesLnHelp:.word 0
+MovsHelp:.blkw 5
+auxBoard:.blkw 256.
+.even
+currMove: .word 0
+boardAddress: .word 0
+movLen: .word 1
+movelen2: .word 0
+movsarr2: .blkw 5
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

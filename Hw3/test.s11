@@ -1,0 +1,124 @@
+        . = torg+1000
+sum: .word 0.
+main: mov Height,r0
+	  mul Width,r0
+	  mov r1,r3
+	  sub #1,r3 ;r3 is number of elements in array
+loop1: add r1,sum ;sums the sum
+	   sob r1,loop1
+	   mov NumMoves,r5
+	mov #Moves,r2 ;caculate the current move
+
+loop2: 	cmp r5, #0 ; if num of moves is 0 jump to isSolved
+	beq isSolved
+	mov Height,r0
+	mul Width,r0
+	;r0 is now free to use until next iteration
+	mov r1,r3
+	sub #1,r3
+	mov sum,r1
+	;now we have the num of elements in r3 and the sum in r1
+	add #InitialBoard,r0
+
+loop3:  movb (r0)+,r4 ;finds the empty index
+        sub r4,r1
+        sob r3,loop3 
+	;r4 and r3 is now free to use 
+        movb (r2)+,r0
+	
+	cmp r0,#'L
+	beq LeftMove
+	cmp r0,#'R
+	beq RightMove
+	cmp r0,#'U
+	beq UpMove
+	cmp r0,#'D
+	beq DownMove
+	
+UpMove: mov r1,r0
+	add Width,r0
+	mov Height,r3
+	mul Width,r3
+	cmp r0,r4 
+	bpl ErrorNotValid
+	mov r0,r3
+	mov r1,r0  
+	mov r3,r1
+	mov #InitialBoard,r4
+	jmp DoMove
+
+DownMove: mov r1,r0
+	sub Width,r1
+	tst r1
+	bmi ErrorNotValid
+	mov #InitialBoard,r4
+	jmp DoMove
+
+LeftMove: mov r1,r0
+	mov r1,r4
+	sxt r0
+	div Width,r0
+	cmp 0.,r1
+	beq ErrorNotValid
+	mov r4,r0
+	mov r4,r1
+	inc r1
+	mov #InitialBoard,r4
+	jmp DoMove
+	
+
+RightMove:mov r1,r0
+	mov r1,r4
+	sxt r0
+	div Width,r0
+	dec r1;sheerit 
+	cmp 0.,r1
+	beq ErrorNotValid
+	mov r4,r0
+	mov r4,r1
+	dec r1
+	mov #InitialBoard,r4
+	jmp DoMove
+
+DoMove: 
+	cmpb @r4,r1
+	beq ContinueDo
+	inc r4
+	jmp DoMove
+ContinueDo: movb	r0,(r4)
+	    dec r5
+	    jmp loop2
+
+isSolved: mov Height,r2
+	  mul Width,r2
+	  dec r3 ; r3 holds the biggest num
+	  
+loop4:	mov #InitialBoard,r0
+	add r3,r0 
+	movb -(r0),r5 ;r5 holds the current number we're checking
+	cmp r3,r5 ; checks of the num matches his index on the board
+	bne ErrorLegal
+	dec r3
+	sob r1,loop4
+	mov #'S,Output
+	jmp End
+	
+ErrorLegal: mov #'L,Output
+	jmp End
+
+ErrorNotValid: mov #'I,Output
+End: halt
+
+
+.=torg + 5000
+
+
+. = torg + 5000
+InitialBoard: .byte 1, 2, 3, 4, 9., 5, 6, 7, 10., 11., 8. 
+.even
+NumMoves: .word 8
+Moves: .ascii <DRRRULLL> 
+.even
+Width: .word 4
+Height: .word 3
+Output: .byte 0
